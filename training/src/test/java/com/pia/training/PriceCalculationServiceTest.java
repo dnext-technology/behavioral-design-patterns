@@ -113,10 +113,16 @@ class PriceCalculationServiceTest {
 
     }
 
-    void whenThereIsNoDutyFreeAmountWithTwoDiscountAlterationAndOneRaiseAlteration_thenCalculationsMustBeDoneCorrectly(){}
-
-    void whenCartPriceIsNull_thenNullMustReturn(){}
-    void whenPriceOfCartPriceIsNull_thenNullMustReturn(){}
+    @Test
+    void whenCartPriceIsNull_thenNullMustReturn(){
+        PriceCalculationService priceCalculationService = new PriceCalculationService(null);
+        Assertions.assertNull(priceCalculationService.calculate(1));
+    }
+    @Test
+    void whenPriceOfCartPriceIsNull_thenNullMustReturn(){
+        PriceCalculationService priceCalculationService = new PriceCalculationService(new CartPrice());
+        Assertions.assertNull(priceCalculationService.calculate(1));
+    }
 
 
 }

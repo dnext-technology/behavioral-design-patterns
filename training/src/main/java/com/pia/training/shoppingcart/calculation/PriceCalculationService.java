@@ -1,14 +1,14 @@
 package com.pia.training.shoppingcart.calculation;
 
+import com.pia.training.shoppingcart.command.*;
 import com.pia.training.shoppingcart.model.AlterationType;
 import com.pia.training.shoppingcart.model.CartPrice;
-import com.pia.training.shoppingcart.model.Price;
 import com.pia.training.shoppingcart.model.PriceAlteration;
-import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
+import java.util.stream.Collectors;
 
 public class PriceCalculationService {
 
@@ -18,72 +18,36 @@ public class PriceCalculationService {
         this.cartPrice = cartPrice;
     }
 
-    public CartPrice calculate(Integer quantity){
-        if(cartPrice.getPrice().getDutyFreeAmount() == null){
-            cartPrice.getPrice().setDutyFreeAmount(
-                    BigDecimal.valueOf(cartPrice.getPrice().getTaxIncludedAmount() / (1.0F + cartPrice.getPrice().getTaxRate() / 100.0F)).setScale(2, RoundingMode.HALF_UP)
-                            .floatValue());
+    public CartPrice calculate(Integer quantity) {
+        if (cartPrice == null || cartPrice.getPrice() == null) {
+            return null;
         }
+        new DutyFreeAmountCalculationCommand(cartPrice).calculate();
 
-        if(cartPrice.getPriceAlteration() != null && !cartPrice.getPriceAlteration().isEmpty()){
-            cartPrice.getPriceAlteration().stream().sorted(Comparator.comparing(PriceAlteration::getPriority)).forEach(priceAlteration -> calculatePriceAlteration(priceAlteration));
+        if (cartPrice.getPriceAlteration() != null && !cartPrice.getPriceAlteration().isEmpty()) {
+            cartPrice.getPriceAlteration()
+                    .stream()
+                    .sorted(Comparator.comparing(PriceAlteration::getPriority))
+                    .map(priceAlteration -> createPriceAlterationCommand(priceAlteration, cartPrice))
+                    .forEach(priceAlterationCommand -> priceAlterationCommand.calculate());
         }
-
-        if(quantity != null && quantity > 0){
-            cartPrice.getPrice().setDutyFreeAmount(cartPrice.getPrice().getDutyFreeAmount() * quantity);
-        }
-
-
-        Float taxRate = cartPrice.getPrice().getTaxRate() == null ? 0.0F : cartPrice.getPrice().getTaxRate();
-        cartPrice.getPrice().setTaxIncludedAmount(
-                BigDecimal.valueOf(cartPrice.getPrice().getDutyFreeAmount()
-                                *
-                                (1.0F + taxRate / 100.0F)).setScale(2, RoundingMode.HALF_UP)
-                        .floatValue());
-
+        new QuantityCalculationCommand(cartPrice, quantity).calculate();
+        new TaxCalculationCommand(cartPrice).calculate();
         return cartPrice;
     }
 
 
-
-    public void calculatePriceAlteration(PriceAlteration priceAlteration){
+    public PriceAlterationCommand createPriceAlterationCommand(PriceAlteration priceAlteration, CartPrice cartPrice){
         if(priceAlteration.getAlterationType() == AlterationType.DISCOUNT){
-            applyDiscountAlteration(priceAlteration);
-        } else if (priceAlteration.getAlterationType() == AlterationType.RAISE){
-            applyRaiseAlteration(priceAlteration);
-        } else if (priceAlteration.getAlterationType() == AlterationType.OVERRIDE) {
-            applyOverrideAlteration(priceAlteration);
+            return new DiscountAlterationCommand(cartPrice, priceAlteration);
         }
-    }
-
-    public void applyOverrideAlteration(PriceAlteration priceAlteration){
-        cartPrice.getPrice().setDutyFreeAmount(priceAlteration.getPrice().getDutyFreeAmount());
-    }
-
-
-    public void applyDiscountAlteration(PriceAlteration priceAlteration){
-        if (priceAlteration.getPrice().getPercentage() != null) {
-            cartPrice.getPrice().setDutyFreeAmount(
-                    BigDecimal.valueOf(cartPrice.getPrice().getDutyFreeAmount()
-                                    *
-                                    (1.0F - priceAlteration.getPrice().getPercentage() / 100.0F))
-                            .setScale(2, RoundingMode.HALF_UP)
-                            .floatValue());
-        } else {
-            cartPrice.getPrice().setDutyFreeAmount(cartPrice.getPrice().getDutyFreeAmount() - priceAlteration.getPrice().getDutyFreeAmount());
+        if(priceAlteration.getAlterationType() == AlterationType.RAISE){
+            return new RaiseAlterationCommand(cartPrice, priceAlteration);
         }
+        if(priceAlteration.getAlterationType() == AlterationType.OVERRIDE){
+            return new OverrideAlterationCommand(cartPrice, priceAlteration);
+        }
+        return null;
     }
 
-    public void applyRaiseAlteration(PriceAlteration priceAlteration){
-        if (priceAlteration.getPrice().getPercentage() != null) {
-            cartPrice.getPrice().setDutyFreeAmount(
-                    BigDecimal.valueOf(cartPrice.getPrice().getDutyFreeAmount()
-                                    *
-                                    (1.0F + priceAlteration.getPrice().getPercentage() / 100.0F))
-                            .setScale(2, RoundingMode.HALF_UP)
-                            .floatValue());
-        } else {
-            cartPrice.getPrice().setDutyFreeAmount(cartPrice.getPrice().getDutyFreeAmount() + priceAlteration.getPrice().getDutyFreeAmount());
-        }
-    }
 }

@@ -8,7 +8,6 @@ import java.util.List;
 @Getter
 @Setter
 public class CartItem {
-
     private Integer quantity = 1;
     private List<CartPrice> itemPrice = null;
 }
